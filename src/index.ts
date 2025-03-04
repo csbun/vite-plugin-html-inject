@@ -57,6 +57,10 @@ function injectHTML(pluginConfig?: InjectHTMLConfig): Plugin {
 					`injectHTML: Source attribute '${sourceAttr}' missing in\r\n${tag}`,
 				);
 			}
+			// replace %VITE_ENV_VARIABLES% in url
+			Object.entries(config?.env || {}).forEach(([key, value]) => {
+				url = url.replace(new RegExp(`%\\s*${key}\\s*%`, 'gsi'), `${value}`);
+			});
 
 			let root = config.root;
 
