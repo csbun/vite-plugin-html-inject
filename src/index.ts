@@ -1,6 +1,7 @@
-import { normalizePath, Plugin, ResolvedConfig } from 'vite';
+import { IndexHtmlTransformContext, normalizePath, Plugin, ResolvedConfig } from 'vite';
 import path from 'path';
 import fs from 'fs';
+import htmlEnvHook from './htmlEnvHook';
 
 const attrNameExpr = '[a-z0-9_-]+';
 const attrDataExpr = '[^"]*';
@@ -35,11 +36,14 @@ function injectHTML(pluginConfig?: InjectHTMLConfig): Plugin {
 
 	const fileList = new Set<string>();
 
-	async function renderSnippets(code: string, codePath: string) {
+	async function renderSnippets(code: string, ctx: IndexHtmlTransformContext) {
 		if (!config) {
 			return code;
 		}
 
+		const replaceHtmlEnv = htmlEnvHook(config);
+		code = (await replaceHtmlEnv(code, ctx)) as string;
+		const codePath = ctx.path;
 		const matches = code.matchAll(tagMatcher);
 
 		for (const match of matches) {
@@ -57,10 +61,6 @@ function injectHTML(pluginConfig?: InjectHTMLConfig): Plugin {
 					`injectHTML: Source attribute '${sourceAttr}' missing in\r\n${tag}`,
 				);
 			}
-			// replace %VITE_ENV_VARIABLES% in url
-			Object.entries(config?.env || {}).forEach(([key, value]) => {
-				url = url.replace(new RegExp(`%\\s*${key}\\s*%`, 'gsi'), `${value}`);
-			});
 
 			let root = config.root;
 
@@ -142,14 +142,10 @@ function injectHTML(pluginConfig?: InjectHTMLConfig): Plugin {
 		},
 		transformIndexHtml: {
 			enforce: 'pre',
-			transform(html, ctx) {
-				return renderSnippets(html, ctx.path);
-			},
+			transform: renderSnippets,
 			// ^ Keeping for Vite below version 4.0.0
 			order: 'pre',
-			handler(html, ctx) {
-				return renderSnippets(html, ctx.path);
-			},
+			handler: renderSnippets,
 		},
 	};
 }
